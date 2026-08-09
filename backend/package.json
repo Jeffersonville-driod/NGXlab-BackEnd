@@ -1,0 +1,14 @@
+{
+  "name": "node-backend-api",
+  "version": "1.0.0",
+  "description": "Serverless Node.js backend for Flutter Web",
+  "main": "api/index.js",
+  "scripts": {
+    "start": "node api/index.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2"
+  }
+}
