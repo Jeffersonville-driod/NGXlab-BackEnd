@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const authRouter = require('../lib/auth-router');
+const { checkDatabaseConnection } = require('../lib/auth-database');
 
 if (process.env.NODE_ENV !== 'production') {
   require('dotenv').config();
@@ -17,13 +18,22 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '10kb' }));
 
-// Main base API endpoint
-app.get('/api', (req, res) => {
-  res.status(200).json({
-    message: "API workspace initialized successfully from scratch!",
-    status: "online",
-    timestamp: new Date()
-  });
+app.get('/api', async (req, res) => {
+  try {
+    await checkDatabaseConnection();
+    return res.status(200).json({
+      status: 'online',
+      database: 'connected',
+      timestamp: new Date()
+    });
+  } catch (error) {
+    console.error('Database health check failed:', error);
+    return res.status(503).json({
+      status: 'offline',
+      database: 'disconnected',
+      timestamp: new Date()
+    });
+  }
 });
 
 app.use('/api/auth', authRouter);

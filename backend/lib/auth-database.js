@@ -59,4 +59,10 @@ async function getAuthCollections() {
   return { users, sessions, passwordResetTokens, authRateLimits };
 }
 
-module.exports = { getAuthCollections };
+async function checkDatabaseConnection() {
+  await getAuthCollections();
+  const client = await clientPromise;
+  await client.db(process.env.MONGODB_DB).command({ ping: 1 });
+}
+
+module.exports = { checkDatabaseConnection, getAuthCollections };
