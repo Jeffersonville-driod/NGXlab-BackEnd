@@ -30,13 +30,19 @@ async function getAuthCollections() {
   const database = client.db(databaseName);
   const users = database.collection('users');
   const sessions = database.collection('sessions');
+  const passwordResetTokens = database.collection('passwordResetTokens');
+  const authRateLimits = database.collection('authRateLimits');
 
   if (!indexesPromise) {
     indexesPromise = Promise.all([
       users.createIndex({ email: 1 }, { unique: true }),
       users.createIndex({ googleSub: 1 }, { unique: true, sparse: true }),
       sessions.createIndex({ tokenHash: 1 }, { unique: true }),
-      sessions.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 })
+      sessions.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
+      passwordResetTokens.createIndex({ tokenHash: 1 }, { unique: true }),
+      passwordResetTokens.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
+      passwordResetTokens.createIndex({ userId: 1 }),
+      authRateLimits.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 })
     ]).catch((error) => {
       indexesPromise = undefined;
       throw error;
@@ -44,7 +50,7 @@ async function getAuthCollections() {
   }
 
   await indexesPromise;
-  return { users, sessions };
+  return { users, sessions, passwordResetTokens, authRateLimits };
 }
 
 module.exports = { getAuthCollections };

@@ -8,6 +8,7 @@ if (process.env.NODE_ENV !== 'production') {
 
 const app = express();
 const frontendOrigin = 'https://www.ngxlab.xyz';
+app.set('trust proxy', 1);
 const authCors = cors({
   origin: (origin, callback) => callback(null, origin === frontendOrigin),
   credentials: true,

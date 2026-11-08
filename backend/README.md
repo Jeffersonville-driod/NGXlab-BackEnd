@@ -7,8 +7,11 @@ Set these variables in the deployment environment:
 - `MONGODB_URI`: MongoDB connection string.
 - `MONGODB_DB`: database name.
 - `GOOGLE_CLIENT_ID`: OAuth 2.0 web client ID used to verify Google ID tokens.
+- `RESEND_API_URL`: Resend email endpoint (`https://api.resend.com/emails`).
+- `RESEND_API_KEY`: Resend API key.
+- `RESEND_FROM_EMAIL`: sender address verified with Resend.
 
-The API creates unique account indexes and expiring session indexes automatically. Do not commit credentials.
+The API creates unique account indexes and expiring session, password-reset, and rate-limit indexes automatically. Do not commit credentials.
 
 ## Authentication endpoints
 
@@ -63,6 +66,32 @@ Successful requests return a profile without password data:
 ```
 
 Registration responds with HTTP `201`; login and Google sign-in respond with HTTP `200`.
+Password accounts can sign in immediately after registration; email verification is not currently required. Google sign-in requires a Google-verified email.
+
+### `POST /api/auth/forgot-password`
+
+Request:
+
+```json
+{
+  "email": "jane@example.com"
+}
+```
+
+Returns the same generic response whether or not the account exists. When an account exists, the API emails a single-use link to `https://www.ngxlab.xyz/reset-password?token=...`. The link expires after 30 minutes. Login and recovery requests are rate-limited.
+
+### `POST /api/auth/reset-password`
+
+Request:
+
+```json
+{
+  "token": "token-from-the-reset-link",
+  "password": "a-new-strong-password"
+}
+```
+
+A successful reset invalidates existing sessions. The frontend must provide the `/reset-password` page to read the token from the query string and submit it to this endpoint.
 
 Errors use this format:
 
