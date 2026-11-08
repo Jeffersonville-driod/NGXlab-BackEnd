@@ -2,6 +2,7 @@ const { MongoClient } = require('mongodb');
 
 let clientPromise;
 let indexesPromise;
+let connectionLogged = false;
 
 async function getAuthCollections() {
   const uri = process.env.MONGODB_URI;
@@ -50,6 +51,11 @@ async function getAuthCollections() {
   }
 
   await indexesPromise;
+  if (!connectionLogged) {
+    console.log('Connected to database');
+    connectionLogged = true;
+  }
+
   return { users, sessions, passwordResetTokens, authRateLimits };
 }
 
