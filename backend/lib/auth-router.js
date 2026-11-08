@@ -6,7 +6,7 @@ const { getAuthCollections } = require('./auth-database');
 
 const router = express.Router();
 const scrypt = promisify(crypto.scrypt);
-const frontendOrigin = 'https://www.ngxlab.com';
+const frontendOrigin = 'https://www.ngxlab.xyz';
 const sessionCookieName = 'ngxlab_session';
 const sessionTtlMs = 14 * 24 * 60 * 60 * 1000;
 const sessionTtlSeconds = sessionTtlMs / 1000;

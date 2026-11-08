@@ -12,7 +12,7 @@ The API creates unique account indexes and expiring session indexes automaticall
 
 ## Authentication endpoints
 
-All authentication requests must have the exact origin `https://www.ngxlab.com`.
+All authentication requests must have the exact origin `https://www.ngxlab.xyz`.
 The frontend must send requests with credentials enabled so the browser accepts and sends the session cookie.
 
 ### `POST /api/auth/register`
@@ -81,4 +81,4 @@ Invalid input returns HTTP `400` (`INVALID_INPUT`), invalid login credentials re
 
 Successful registration and login create a random opaque session token. Only its SHA-256 hash is stored in MongoDB; the raw token is set in an `HttpOnly`, `Secure` production cookie with a 14-day lifetime. Passwords are stored as salted scrypt hashes.
 
-The cookie is configured as `SameSite=None` on production because the current `vercel.app` API host is cross-site from `www.ngxlab.com`. Some browsers block such third-party cookies. Prefer mapping the API to `api.ngxlab.com` and use credentialed frontend requests; this makes the frontend and API same-site and avoids relying on third-party cookies.
+The cookie is configured as `SameSite=None` on production because the current `vercel.app` API host is cross-site from `www.ngxlab.xyz`. Some browsers block such third-party cookies. Prefer mapping the API to `api.ngxlab.xyz` and use credentialed frontend requests; this makes the frontend and API same-site and avoids relying on third-party cookies.
