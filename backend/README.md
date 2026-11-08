@@ -4,8 +4,7 @@
 
 Set these variables in the deployment environment:
 
-- `MONGODB_URI`: MongoDB connection string.
-- `MONGODB_DB`: database name.
+- `MONGODB_URI`: MongoDB connection string, including the database name in its path.
 - `GOOGLE_CLIENT_ID`: OAuth 2.0 web client ID used to verify Google ID tokens.
 - `RESEND_API_URL`: Resend email endpoint (`https://api.resend.com/emails`).
 - `RESEND_API_KEY`: Resend API key.

@@ -6,9 +6,8 @@ let connectionLogged = false;
 
 async function getAuthCollections() {
   const uri = process.env.MONGODB_URI;
-  const databaseName = process.env.MONGODB_DB;
 
-  if (!uri || !databaseName) {
+  if (!uri) {
     const error = new Error('MongoDB authentication storage is not configured');
     error.statusCode = 503;
     error.code = 'AUTH_STORAGE_NOT_CONFIGURED';
@@ -28,7 +27,7 @@ async function getAuthCollections() {
   }
 
   const client = await clientPromise;
-  const database = client.db(databaseName);
+  const database = client.db();
   const users = database.collection('users');
   const sessions = database.collection('sessions');
   const passwordResetTokens = database.collection('passwordResetTokens');
@@ -62,7 +61,7 @@ async function getAuthCollections() {
 async function checkDatabaseConnection() {
   await getAuthCollections();
   const client = await clientPromise;
-  await client.db(process.env.MONGODB_DB).command({ ping: 1 });
+  await client.db().command({ ping: 1 });
 }
 
 module.exports = { checkDatabaseConnection, getAuthCollections };
