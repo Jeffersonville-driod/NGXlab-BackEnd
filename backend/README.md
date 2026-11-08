@@ -13,6 +13,8 @@ Set these variables in the deployment environment:
 
 The API creates unique account indexes and expiring session, password-reset, and rate-limit indexes automatically. Do not commit credentials.
 
+The Vercel project root is the repository root. The root `api/index.js` function forwards `/api/*` requests to this Express app; keep API rewrites pointed at that function rather than the nested source file, which can otherwise be served as a static asset.
+
 ## Authentication endpoints
 
 All authentication requests must have the exact origin `https://www.ngxlab.xyz`.

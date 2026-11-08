@@ -1,0 +1,10 @@
+{
+  "name": "ngxlab-vercel",
+  "private": true,
+  "workspaces": [
+    "backend"
+  ],
+  "overrides": {
+    "qs": "^6.17.1"
+  }
+}

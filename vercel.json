@@ -2,12 +2,16 @@
   "version": 2,
   "rewrites": [
     {
-      "source": "/api/(.*)",
-      "destination": "/backend/api/index.js"
+      "source": "/api",
+      "destination": "/api/index?__path=/api"
     },
     {
-      "source": "/(.*)",
-      "destination": "/frontend/build/web/$1"
+      "source": "/api/:path*",
+      "destination": "/api/index?__path=/api/:path*"
+    },
+    {
+      "source": "/:path*",
+      "destination": "/frontend/build/web/:path*"
     }
   ]
 }
