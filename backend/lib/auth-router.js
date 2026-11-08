@@ -215,12 +215,97 @@ async function sendPasswordResetEmail(configuration, user, token) {
   }
 }
 
-function logPasswordResetFailure(stage, error) {
-  console.error('Password recovery operation failed', {
+async function sendWelcomeEmail(user) {
+  const configuration = getResendConfiguration();
+  const safeName = escapeHtml(user.name || 'there');
+  const siteUrl = 'https://www.ngxlab.xyz';
+  const safeSiteUrl = escapeHtml(siteUrl);
+  const response = await fetch(configuration.endpoint, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${configuration.apiKey}`,
+      'Content-Type': 'application/json'
+    },
+    signal: AbortSignal.timeout(10000),
+    body: JSON.stringify({
+      from: configuration.from,
+      to: [user.email],
+      subject: 'Welcome to NGXLab — learn the why',
+      text: `Hi ${user.name || 'there'},\n\nWelcome to NGXLab — a thoughtful place to learn about investing, explore Nigerian market concepts with virtual funds, and reflect on your choices.\n\nNo real orders, no pressure, and no promises of returns. Just room to learn at your own pace.\n\nExplore NGXLab: ${siteUrl}\n\nThe NGXLab team`,
+      html: `<!doctype html>
+<html lang="en">
+  <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head>
+  <body style="margin:0;padding:32px 12px;background:#f3f5f1;color:#17231f;font-family:Arial,Helvetica,sans-serif;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden;">
+      <tr>
+        <td style="padding:28px 36px;background:#123d32;color:#ffffff;">
+          <div style="font-size:22px;font-weight:700;letter-spacing:1px;">NGX<span style="color:#c6e66b;">LAB</span></div>
+          <div style="margin-top:8px;color:#dce8df;font-size:13px;">A more thoughtful way to learn investing</div>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:40px 36px 24px;">
+          <div style="color:#547164;font-size:12px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;">Welcome aboard</div>
+          <h1 style="margin:12px 0 16px;color:#123d32;font-size:30px;line-height:1.2;">Hi ${safeName},<br>learn the why.</h1>
+          <p style="margin:0;color:#43534c;font-size:16px;line-height:1.7;">Your NGXLab account is ready. This is a space to build understanding, explore ideas, and take your time.</p>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:0 36px 28px;">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+            <tr><td style="padding:16px 18px;border-left:3px solid #c6e66b;background:#f5f8f2;">
+              <p style="margin:0 0 8px;color:#123d32;font-size:15px;font-weight:700;">Start with the idea</p>
+              <p style="margin:0;color:#526159;font-size:14px;line-height:1.6;">Learn about shares, the Nigerian market, and investing principles in clear, everyday language.</p>
+            </td></tr>
+            <tr><td height="10"></td></tr>
+            <tr><td style="padding:16px 18px;border-left:3px solid #c6e66b;background:#f5f8f2;">
+              <p style="margin:0 0 8px;color:#123d32;font-size:15px;font-weight:700;">Explore without real orders</p>
+              <p style="margin:0;color:#526159;font-size:14px;line-height:1.6;">Try hypothetical market scenarios with virtual funds—no money at risk.</p>
+            </td></tr>
+            <tr><td height="10"></td></tr>
+            <tr><td style="padding:16px 18px;border-left:3px solid #c6e66b;background:#f5f8f2;">
+              <p style="margin:0 0 8px;color:#123d32;font-size:15px;font-weight:700;">Make room to reflect</p>
+              <p style="margin:0;color:#526159;font-size:14px;line-height:1.6;">Think about the reasons, trade-offs, and lessons behind each choice.</p>
+            </td></tr>
+          </table>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:0 36px 36px;text-align:center;">
+          <a href="${safeSiteUrl}" style="display:inline-block;padding:14px 24px;border-radius:8px;background:#123d32;color:#ffffff;font-size:15px;font-weight:700;text-decoration:none;">Explore NGXLab</a>
+          <p style="margin:20px 0 0;color:#718078;font-size:12px;line-height:1.6;">Learning over hype. Practice results are lessons, not promises.</p>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:20px 36px;background:#f3f5f1;color:#718078;font-size:12px;line-height:1.6;">You’re receiving this one-time welcome email because an NGXLab account was created with this address.</td>
+      </tr>
+    </table>
+  </body>
+</html>`
+    })
+  });
+
+  if (!response.ok) {
+    const error = new Error('Resend rejected the welcome email');
+    error.statusCode = response.status;
+    throw error;
+  }
+}
+
+function logEmailFailure(stage, error) {
+  console.error('Authentication email operation failed', {
     stage,
     name: error.name || 'Error',
     code: error.code || error.statusCode || 'unknown'
   });
+}
+
+async function sendWelcomeEmailSafely(user) {
+  try {
+    await sendWelcomeEmail(user);
+  } catch (error) {
+    logEmailFailure('welcome', error);
+  }
 }
 
 function isDuplicateKeyError(error) {
@@ -323,12 +408,12 @@ async function attachGoogleIdentity(user, subject, users) {
 async function findOrCreateGoogleUser(profile, users) {
   let user = await users.findOne({ googleSub: profile.subject });
   if (user) {
-    return user;
+    return { user, created: false };
   }
 
   user = await users.findOne({ email: profile.email });
   if (user) {
-    return attachGoogleIdentity(user, profile.subject, users);
+    return { user: await attachGoogleIdentity(user, profile.subject, users), created: false };
   }
 
   const newUser = {
@@ -339,8 +424,9 @@ async function findOrCreateGoogleUser(profile, users) {
   };
 
   try {
-    await users.insertOne(newUser);
-    return newUser;
+    const result = await users.insertOne(newUser);
+    newUser._id = result.insertedId;
+    return { user: newUser, created: true };
   } catch (error) {
     if (!isDuplicateKeyError(error)) {
       throw error;
@@ -348,12 +434,12 @@ async function findOrCreateGoogleUser(profile, users) {
 
     user = await users.findOne({ googleSub: profile.subject });
     if (user) {
-      return user;
+      return { user, created: false };
     }
 
     user = await users.findOne({ email: profile.email });
     if (user) {
-      return attachGoogleIdentity(user, profile.subject, users);
+      return { user: await attachGoogleIdentity(user, profile.subject, users), created: false };
     }
 
     throw error;
@@ -381,6 +467,7 @@ router.post('/register', requireFrontendOrigin, asyncHandler(async (req, res) =>
   }
 
   await createSession(user._id, sessions, res);
+  await sendWelcomeEmailSafely(user);
   return res.status(201).json({ user: publicUser(user) });
 }));
 
@@ -425,7 +512,7 @@ router.post('/forgot-password', requireFrontendOrigin, asyncHandler(async (req, 
       });
       await sendPasswordResetEmail(resendConfiguration, user, token);
     } catch (error) {
-      logPasswordResetFailure('issue-or-send', error);
+      logEmailFailure('password-reset-issue-or-send', error);
     }
   }
 
@@ -493,7 +580,7 @@ router.post('/google', requireFrontendOrigin, asyncHandler(async (req, res) => {
   }
 
   const { users, sessions } = await getAuthCollections();
-  const user = await findOrCreateGoogleUser({
+  const { user, created } = await findOrCreateGoogleUser({
     subject: payload.sub,
     email: validateEmail(payload.email),
     name: typeof payload.name === 'string' && payload.name.trim()
@@ -502,6 +589,9 @@ router.post('/google', requireFrontendOrigin, asyncHandler(async (req, res) => {
   }, users);
 
   await createSession(user._id, sessions, res);
+  if (created) {
+    await sendWelcomeEmailSafely(user);
+  }
   return res.status(200).json({ user: publicUser(user) });
 }));
 

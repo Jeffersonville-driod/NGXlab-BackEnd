@@ -7,10 +7,14 @@ Set these variables in the deployment environment:
 - `MONGODB_URI`: MongoDB connection string, including the database name in its path.
 - `GOOGLE_CLIENT_ID`: OAuth 2.0 web client ID used to verify Google ID tokens.
 - `RESEND_API_URL`: Resend email endpoint (`https://api.resend.com/emails`).
-- `RESEND_API_KEY`: Resend API key.
-- `RESEND_FROM_EMAIL`: sender address verified with Resend.
+- `RESEND_API_KEY`: Resend API key, stored only in the backend environment.
+- `RESEND_FROM_EMAIL`: sender address verified with Resend, stored only in the backend environment.
+
+Configure these values in the backend's local `backend/.env` for development and in the backend Vercel project's environment settings for deployment. Never put the Resend API key or sender configuration in frontend code or frontend environment variables.
 
 The API creates unique account indexes and expiring session, password-reset, and rate-limit indexes automatically. Do not commit credentials.
+
+New password and Google accounts receive a one-time welcome email through the configured Resend settings. Email delivery failures are logged and do not prevent account creation.
 
 The Vercel project root is the repository root. The root `api/index.js` function forwards `/api/*` requests to this Express app; keep API rewrites pointed at that function rather than the nested source file, which can otherwise be served as a static asset.
 
@@ -79,7 +83,7 @@ Request:
 }
 ```
 
-Returns the same generic response whether or not the account exists. When an account exists, the API emails a single-use link to `https://www.ngxlab.xyz/reset-password?token=...`. The link expires after 30 minutes. Login and recovery requests are rate-limited.
+Returns the same generic response whether or not the account exists. When an account exists, the API emails a single-use link to `https://www.ngxlab.xyz/reset-password?token=...`. Only a SHA-256 hash of the token is stored; the token expires after 30 minutes and is atomically consumed on use. Recovery requests are rate-limited by IP and email.
 
 ### `POST /api/auth/reset-password`
 
@@ -92,7 +96,7 @@ Request:
 }
 ```
 
-A successful reset invalidates existing sessions. The frontend must provide the `/reset-password` page to read the token from the query string and submit it to this endpoint.
+A successful reset invalidates existing sessions. Passwords must be between 8 and 128 characters and are stored as salted scrypt hashes. The frontend must provide the `/reset-password` page to read the token from the query string and submit it to this endpoint.
 
 Errors use this format:
 
