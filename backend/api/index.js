@@ -9,14 +9,12 @@ if (process.env.NODE_ENV !== 'production') {
 const app = express();
 const frontendOrigin = 'https://www.ngxlab.xyz';
 app.set('trust proxy', 1);
-const authCors = cors({
-  origin: (origin, callback) => callback(null, origin === frontendOrigin),
+app.use(cors({
+  origin: frontendOrigin,
   credentials: true,
-  methods: ['POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type']
-});
-
-app.use('/api/auth', authCors);
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(express.json({ limit: '10kb' }));
 
 // Main base API endpoint
