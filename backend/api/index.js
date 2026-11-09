@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const authRouter = require('../lib/auth-router');
 const marketRouter = require('../lib/market-router');
+const portfolioRouter = require('../lib/portfolio-router');
 const { checkDatabaseConnection } = require('../lib/auth-database');
 
 if (process.env.NODE_ENV !== 'production') {
@@ -39,6 +40,7 @@ app.get('/api', async (req, res) => {
 
 app.use('/api/auth', authRouter);
 app.use('/api/market', marketRouter);
+app.use('/api/portfolio', portfolioRouter);
 
 app.use((req, res) => {
   res.status(404).json({

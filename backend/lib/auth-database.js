@@ -33,6 +33,8 @@ async function getAuthCollections() {
   const passwordResetTokens = database.collection('passwordResetTokens');
   const authRateLimits = database.collection('authRateLimits');
   const marketSnapshots = database.collection('marketSnapshots');
+  const portfolios = database.collection('portfolios');
+  const trades = database.collection('trades');
 
   if (!indexesPromise) {
     indexesPromise = Promise.all([
@@ -43,7 +45,9 @@ async function getAuthCollections() {
       passwordResetTokens.createIndex({ tokenHash: 1 }, { unique: true }),
       passwordResetTokens.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
       passwordResetTokens.createIndex({ userId: 1 }),
-      authRateLimits.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 })
+      authRateLimits.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
+      portfolios.createIndex({ userId: 1 }, { unique: true }),
+      trades.createIndex({ userId: 1, tradeDate: -1 })
     ]).catch((error) => {
       indexesPromise = undefined;
       throw error;
@@ -56,7 +60,16 @@ async function getAuthCollections() {
     connectionLogged = true;
   }
 
-  return { users, sessions, passwordResetTokens, authRateLimits, marketSnapshots };
+  return {
+    users,
+    sessions,
+    passwordResetTokens,
+    authRateLimits,
+    marketSnapshots,
+    portfolios,
+    trades,
+    client
+  };
 }
 
 async function checkDatabaseConnection() {

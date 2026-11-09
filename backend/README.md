@@ -155,3 +155,113 @@ Returns DANGSUGAR's latest quote from the MongoDB snapshot. It does not call Kob
 ```
 
 Historical price data is not included in this daily snapshot.
+
+## Demo portfolio and trading
+
+These authenticated endpoints use the signed-in `ngxlab_session` cookie. Send browser requests with credentials enabled. All funds and orders are simulated: these routes never place real orders and never call Kobo for an individual trade. Trade prices come only from the latest stored `marketSnapshots` quote.
+
+### `GET /api/portfolio`
+
+Returns the signed-in user's virtual cash balance, current holdings, and up to the 100 most recent executed trades:
+
+```json
+{
+  "success": true,
+  "portfolio": {
+    "virtualBalanceNgn": 999350,
+    "holdings": [
+      {
+        "symbol": "DANGSUGAR",
+        "name": "Dangote Sugar Refinery Plc",
+        "quantity": 10,
+        "averagePrice": 65
+      }
+    ],
+    "tradeHistory": [
+      {
+        "id": "trade-id",
+        "symbol": "DANGSUGAR",
+        "name": "Dangote Sugar Refinery Plc",
+        "side": "BUY",
+        "quantity": 10,
+        "price": 65,
+        "total": 650,
+        "trade_date": "2026-11-09T06:00:00.000Z",
+        "market_trade_date": "2026-11-06T00:00:00"
+      }
+    ]
+  }
+}
+```
+
+Holding `averagePrice` is the weighted average purchase price. Each trade's `price` is the stored quote per share and `total` is the rounded-to-kobo execution value. `trade_date` is the execution timestamp; `market_trade_date` identifies the quote's market date.
+
+### `POST /api/portfolio/trades`
+
+Request:
+
+```json
+{
+  "symbol": "DANGSUGAR",
+  "side": "BUY",
+  "quantity": 10
+}
+```
+
+`side` must be `BUY` or `SELL`; `quantity` must be a positive whole number of shares. A successful response (`200`) includes the executed trade and the updated portfolio in the same shapes returned above:
+
+```json
+{
+  "success": true,
+  "trade": {
+    "id": "trade-id",
+    "symbol": "DANGSUGAR",
+    "name": "Dangote Sugar Refinery Plc",
+    "side": "BUY",
+    "quantity": 10,
+    "price": 65,
+    "total": 650,
+    "trade_date": "2026-11-09T06:00:00.000Z",
+    "market_trade_date": "2026-11-06T00:00:00"
+  },
+  "portfolio": {
+    "virtualBalanceNgn": 999350,
+    "holdings": [
+      {
+        "symbol": "DANGSUGAR",
+        "name": "Dangote Sugar Refinery Plc",
+        "quantity": 10,
+        "averagePrice": 65
+      }
+    ],
+    "tradeHistory": [
+      {
+        "id": "trade-id",
+        "symbol": "DANGSUGAR",
+        "name": "Dangote Sugar Refinery Plc",
+        "side": "BUY",
+        "quantity": 10,
+        "price": 65,
+        "total": 650,
+        "trade_date": "2026-11-09T06:00:00.000Z",
+        "market_trade_date": "2026-11-06T00:00:00"
+      }
+    ]
+  }
+}
+```
+
+A buy deducts `price × quantity` from the account's existing `virtualBalanceNgn`; a sell credits it and removes the sold shares. Trades update the user balance, holdings, and trade history in one MongoDB transaction. The database must support transactions (for example, a MongoDB replica set). Existing accounts are not automatically topped up; the one-time opening balance is assigned only when an account is created.
+
+Trade errors use the standard `{ "error": { "code": "...", "message": "..." } }` shape:
+
+| HTTP | Code | Meaning |
+|---|---|---|
+| `400` | `INVALID_TRADE` | Malformed request, invalid symbol format, side, quantity, or unsupported trade value |
+| `401` | `UNAUTHENTICATED` | Missing, expired, or invalid session |
+| `404` | `UNKNOWN_SYMBOL` | Symbol is not present in the latest stored snapshot |
+| `409` | `INSUFFICIENT_VIRTUAL_FUNDS` | Buy exceeds the user's available virtual cash |
+| `409` | `INSUFFICIENT_HOLDINGS` | Sell exceeds the user's available shares |
+| `503` | `MARKET_DATA_NOT_READY` | No current snapshot or usable quote is available |
+
+Malformed JSON returns `400` (`INVALID_JSON`), request bodies over the 10 KB limit return `413` (`REQUEST_TOO_LARGE`), and unexpected server errors return `500` (`INTERNAL_SERVER_ERROR`).
