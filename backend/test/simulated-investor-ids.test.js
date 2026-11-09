@@ -83,6 +83,8 @@ test('new accounts receive fictional identifiers from the server', async () => {
 
   assert.match(user.simulatedInvestorIds.cscs, /^DEMO-CSCS-[0-9a-f]{16}$/);
   assert.match(user.simulatedInvestorIds.chn, /^DEMO-CHN-[0-9a-f]{16}$/);
+  assert.equal(user.cscsNumber, user.simulatedInvestorIds.cscs);
+  assert.equal(user.chnNumber, user.simulatedInvestorIds.chn);
 });
 
 test('existing accounts are provisioned once and retain stable identifiers', async () => {
@@ -160,6 +162,8 @@ test('account creation retries a database-rejected identifier collision', async 
     assert.equal(calls, 4);
     assert.equal(user.simulatedInvestorIds.cscs, 'DEMO-CSCS-1234567890abcdef');
     assert.equal(user.simulatedInvestorIds.chn, 'DEMO-CHN-fedcba9876543210');
+    assert.equal(user.cscsNumber, user.simulatedInvestorIds.cscs);
+    assert.equal(user.chnNumber, user.simulatedInvestorIds.chn);
   } finally {
     crypto.randomBytes = originalRandomBytes;
   }
@@ -179,6 +183,8 @@ test('authenticated user output contains only the simulated IDs, not account sec
     _id: new ObjectId(),
     name: 'Learner',
     email: 'learner@example.com',
+    cscsNumber: '0001234567',
+    chnNumber: '0000987654',
     passwordHash: 'private-hash',
     googleSub: 'private-google-id',
     simulatedInvestorIds: {
@@ -192,9 +198,27 @@ test('authenticated user output contains only the simulated IDs, not account sec
     cscs: 'DEMO-CSCS-0123456789abcdef',
     chn: 'DEMO-CHN-fedcba9876543210'
   });
+  assert.equal(response.cscsNumber, '0001234567');
+  assert.equal(response.chnNumber, '0000987654');
   assert.equal(JSON.stringify(response).includes('private-hash'), false);
   assert.equal(JSON.stringify(response).includes('private-google-id'), false);
   assert.equal(JSON.stringify(response).includes('must-not-be-returned'), false);
+});
+
+test('authenticated user output uses null for missing or non-string profile numbers', () => {
+  const response = publicUser({
+    _id: new ObjectId(),
+    name: 'Learner',
+    email: 'learner@example.com',
+    cscsNumber: 123456,
+    simulatedInvestorIds: {
+      cscs: 'DEMO-CSCS-0123456789abcdef',
+      chn: 'DEMO-CHN-fedcba9876543210'
+    }
+  });
+
+  assert.equal(response.cscsNumber, null);
+  assert.equal(response.chnNumber, null);
 });
 
 test('new-account welcome email includes both simulated IDs and the real-trading disclaimer', async () => {

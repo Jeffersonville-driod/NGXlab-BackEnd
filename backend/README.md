@@ -11,7 +11,6 @@ Set these variables in the deployment environment:
 - `RESEND_FROM_EMAIL`: sender address verified with Resend, stored only in the backend environment.
 - `KOBO_MARKET_API_KEY`: Kobo Terminal API key, stored only in the backend environment.
 - `CRON_SECRET`: random secret used to authorize scheduled market-data refreshes.
-- `TEMPORARY_VIRTUAL_BALANCE_EMAIL`: temporary, optional account email for the one-time login balance adjustment described below. Keep it in the backend environment only.
 
 Configure these values in the backend's local `backend/.env` for development and in the backend Vercel project's environment settings for deployment. Never put the Resend API key or sender configuration in frontend code or frontend environment variables.
 Never expose the Kobo API key in frontend code; use the backend market-data endpoint below.
@@ -70,7 +69,9 @@ Successful requests return a profile without password data:
     "id": "user-id",
     "name": "Jane Doe",
     "email": "jane@example.com",
-    "virtualBalanceNgn": 1000000,
+    "cscsNumber": "DEMO-CSCS-a1b2c3d4e5f60718",
+    "chnNumber": "DEMO-CHN-18273645aabbccdd",
+    "virtualBalanceNgn": 10000000,
     "simulatedInvestorIds": {
       "cscs": "DEMO-CSCS-a1b2c3d4e5f60718",
       "chn": "DEMO-CHN-18273645aabbccdd"
@@ -81,14 +82,10 @@ Successful requests return a profile without password data:
 
 Registration responds with HTTP `201`; login and Google sign-in respond with HTTP `200`.
 Password accounts can sign in immediately after registration; email verification is not currently required. Google sign-in requires a Google-verified email.
-New password and Google accounts start with `virtualBalanceNgn: 1000000` (₦1,000,000 in simulated practice funds, not real money). Login responses include the user's stored virtual balance. Frontends should display it as a virtual/practice balance and never describe it as a withdrawable deposit.
+New password and Google accounts start with `virtualBalanceNgn: 10000000` (₦10,000,000 in simulated practice funds, not real money). Each new account receives generated `DEMO-` CSCS and CHN strings in `cscsNumber` and `chnNumber`. Login responses include the user's stored virtual balance. Frontends should display it as a virtual/practice balance and never describe it as a withdrawable deposit.
 New-account welcome emails include the account's simulated CSCS and CHN display identifiers with a clear disclaimer that they are not valid for real trading, brokerage, settlement, or securities transfers.
 
-### Temporary one-time login balance adjustment
-
-For the requested account only, setting the backend-only `TEMPORARY_VIRTUAL_BALANCE_EMAIL` environment variable to that account's email enables a temporary login adjustment: after successful password login, if that account's stored virtual balance is zero or missing, it is set to ₦10,000,000. The update is atomic and only matches the configured account; nonzero balances and every other account are left unchanged. The login response includes the updated balance.
-
-Set this variable in the backend deployment environment before the account logs in (or in the local backend environment for local testing). Remove the variable after the login; the code can be removed once the adjustment is no longer needed. This is simulated practice money only and has no cash value.
+Existing accounts are updated on their first successful password or Google login after this change: missing `cscsNumber` and `chnNumber` values are populated from their server-generated `DEMO-` identifiers and their virtual practice balance is set to ₦10,000,000 once. Existing string numbers are preserved, and later logins do not reset the balance. These identifiers and funds are simulated only and have no real-world value.
 
 ### `POST /api/auth/forgot-password`
 
@@ -324,7 +321,9 @@ Requires the signed-in account's session cookie and returns only that account's 
     "id": "user-id",
     "name": "Jane Doe",
     "email": "jane@example.com",
-    "virtualBalanceNgn": 1000000,
+    "cscsNumber": "DEMO-CSCS-a1b2c3d4e5f60718",
+    "chnNumber": "DEMO-CHN-18273645aabbccdd",
+    "virtualBalanceNgn": 10000000,
     "simulatedInvestorIds": {
       "cscs": "DEMO-CSCS-a1b2c3d4e5f60718",
       "chn": "DEMO-CHN-18273645aabbccdd"

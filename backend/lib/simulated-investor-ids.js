@@ -82,7 +82,14 @@ async function provisionSimulatedInvestorIds(users, userId) {
 
 async function insertUserWithSimulatedInvestorIds(users, user) {
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const previousIds = user.simulatedInvestorIds || {};
     user.simulatedInvestorIds = generateSimulatedInvestorIds();
+    if (user.cscsNumber == null || user.cscsNumber === previousIds.cscs) {
+      user.cscsNumber = user.simulatedInvestorIds.cscs;
+    }
+    if (user.chnNumber == null || user.chnNumber === previousIds.chn) {
+      user.chnNumber = user.simulatedInvestorIds.chn;
+    }
     try {
       const result = await users.insertOne(user);
       user._id = result.insertedId;
