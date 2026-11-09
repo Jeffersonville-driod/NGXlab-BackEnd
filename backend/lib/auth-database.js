@@ -32,6 +32,7 @@ async function getAuthCollections() {
   const sessions = database.collection('sessions');
   const passwordResetTokens = database.collection('passwordResetTokens');
   const authRateLimits = database.collection('authRateLimits');
+  const marketSnapshots = database.collection('marketSnapshots');
 
   if (!indexesPromise) {
     indexesPromise = Promise.all([
@@ -55,7 +56,7 @@ async function getAuthCollections() {
     connectionLogged = true;
   }
 
-  return { users, sessions, passwordResetTokens, authRateLimits };
+  return { users, sessions, passwordResetTokens, authRateLimits, marketSnapshots };
 }
 
 async function checkDatabaseConnection() {

@@ -15,6 +15,7 @@ const rateLimitWindowMs = 15 * 60 * 1000;
 const recoveryRateLimitWindowMs = 60 * 60 * 1000;
 const passwordResetUrl = `${frontendOrigin}/reset-password`;
 const genericRecoveryMessage = 'If an account exists for that email, a password reset link will be sent.';
+const initialVirtualBalanceNgn = 1_000_000;
 const scryptOptions = {
   N: 16384,
   r: 8,
@@ -231,7 +232,7 @@ async function sendWelcomeEmail(user) {
       from: configuration.from,
       to: [user.email],
       subject: 'Welcome to NGXLab — learn the why',
-      text: `Hi ${user.name || 'there'},\n\nWelcome to NGXLab — a thoughtful place to learn about investing, explore Nigerian market concepts with virtual funds, and reflect on your choices.\n\nNo real orders, no pressure, and no promises of returns. Just room to learn at your own pace.\n\nExplore NGXLab: ${siteUrl}\n\nThe NGXLab team`,
+      text: `Hi ${user.name || 'there'},\n\nWelcome to NGXLab — a thoughtful place to learn about investing, explore Nigerian market concepts, and reflect on your choices. Your practice account starts with ₦1,000,000 in virtual funds. This is simulated money and has no cash value.\n\nNo real orders, no pressure, and no promises of returns. Just room to learn at your own pace.\n\nExplore NGXLab: ${siteUrl}\n\nThe NGXLab team`,
       html: `<!doctype html>
 <html lang="en">
   <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head>
@@ -247,7 +248,7 @@ async function sendWelcomeEmail(user) {
         <td style="padding:40px 36px 24px;">
           <div style="color:#547164;font-size:12px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;">Welcome aboard</div>
           <h1 style="margin:12px 0 16px;color:#123d32;font-size:30px;line-height:1.2;">Hi ${safeName},<br>learn the why.</h1>
-          <p style="margin:0;color:#43534c;font-size:16px;line-height:1.7;">Your NGXLab account is ready. This is a space to build understanding, explore ideas, and take your time.</p>
+          <p style="margin:0;color:#43534c;font-size:16px;line-height:1.7;">Your NGXLab account is ready with ₦1,000,000 in virtual practice funds. This simulated balance has no cash value. Use it to build understanding, explore ideas, and take your time.</p>
         </td>
       </tr>
       <tr>
@@ -368,7 +369,8 @@ function publicUser(user) {
   return {
     id: user._id.toString(),
     name: user.name,
-    email: user.email
+    email: user.email,
+    virtualBalanceNgn: user.virtualBalanceNgn ?? 0
   };
 }
 
@@ -420,6 +422,7 @@ async function findOrCreateGoogleUser(profile, users) {
     name: profile.name,
     email: profile.email,
     googleSub: profile.subject,
+    virtualBalanceNgn: initialVirtualBalanceNgn,
     createdAt: new Date()
   };
 
@@ -453,6 +456,7 @@ router.post('/register', requireFrontendOrigin, asyncHandler(async (req, res) =>
     name: registration.name,
     email: registration.email,
     passwordHash: await hashPassword(registration.password),
+    virtualBalanceNgn: initialVirtualBalanceNgn,
     createdAt: new Date()
   };
 

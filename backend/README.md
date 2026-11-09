@@ -9,8 +9,11 @@ Set these variables in the deployment environment:
 - `RESEND_API_URL`: Resend email endpoint (`https://api.resend.com/emails`).
 - `RESEND_API_KEY`: Resend API key, stored only in the backend environment.
 - `RESEND_FROM_EMAIL`: sender address verified with Resend, stored only in the backend environment.
+- `KOBO_MARKET_API_KEY`: Kobo Terminal API key, stored only in the backend environment.
+- `CRON_SECRET`: random secret used to authorize scheduled market-data refreshes.
 
 Configure these values in the backend's local `backend/.env` for development and in the backend Vercel project's environment settings for deployment. Never put the Resend API key or sender configuration in frontend code or frontend environment variables.
+Never expose the Kobo API key in frontend code; use the backend market-data endpoint below.
 
 The API creates unique account indexes and expiring session, password-reset, and rate-limit indexes automatically. Do not commit credentials.
 
@@ -65,13 +68,15 @@ Successful requests return a profile without password data:
   "user": {
     "id": "user-id",
     "name": "Jane Doe",
-    "email": "jane@example.com"
+    "email": "jane@example.com",
+    "virtualBalanceNgn": 1000000
   }
 }
 ```
 
 Registration responds with HTTP `201`; login and Google sign-in respond with HTTP `200`.
 Password accounts can sign in immediately after registration; email verification is not currently required. Google sign-in requires a Google-verified email.
+New password and Google accounts start with `virtualBalanceNgn: 1000000` (₦1,000,000 in simulated practice funds, not real money). Login responses include the user's stored virtual balance. Frontends should display it as a virtual/practice balance and never describe it as a withdrawable deposit.
 
 ### `POST /api/auth/forgot-password`
 
@@ -116,3 +121,37 @@ Invalid input returns HTTP `400` (`INVALID_INPUT`), invalid login credentials re
 Successful registration and login create a random opaque session token. Only its SHA-256 hash is stored in MongoDB; the raw token is set in an `HttpOnly`, `Secure` production cookie with a 14-day lifetime. Passwords are stored as salted scrypt hashes.
 
 The cookie is configured as `SameSite=None` on production because the current `vercel.app` API host is cross-site from `www.ngxlab.xyz`. Some browsers block such third-party cookies. Prefer mapping the API to `api.ngxlab.xyz` and use credentialed frontend requests; this makes the frontend and API same-site and avoids relying on third-party cookies.
+
+## Market data
+
+### `GET /api/market/overview`
+
+Returns the latest-session NGX market summary, five largest daily gainers, five largest daily decliners, and five stocks with the highest trading volume from MongoDB. Frontend requests do not call Kobo, so page views do not consume the Kobo quota.
+
+The response contains `as_of`, `trade_date`, `total_stocks`, `market`, `gainers`, `losers`, and `top_volume`. Each stock entry contains `symbol`, `name`, `current_price`, `change_percent`, `volume`, `sector`, and `trade_date`.
+
+Vercel runs `GET /api/market/refresh` once daily at 18:00 UTC. That protected route fetches the provider's stock list once and stores the complete snapshot and rankings in the `marketSnapshots` MongoDB collection. A MongoDB-backed guard allows at most one Kobo request per UTC calendar day, including manual refreshes and duplicate cron invocations. A failed attempt also uses that day's allowance to prevent retries from consuming the quota. Configure the same `CRON_SECRET` environment variable in Vercel so scheduled requests are authorized. For a manual refresh, send `Authorization: Bearer <CRON_SECRET>` to the refresh route.
+
+### `GET /api/market/stocks`
+
+Returns all stocks from the latest MongoDB snapshot, without making a Kobo request.
+
+### `GET /api/market/dangsugar`
+
+Returns DANGSUGAR's latest quote from the MongoDB snapshot. It does not call Kobo or consume API quota.
+
+```json
+{
+  "success": true,
+  "symbol": "DANGSUGAR",
+  "trade_date": "2026-11-06T00:00:00",
+  "stock": {
+    "symbol": "DANGSUGAR",
+    "current_price": 65,
+    "change_percent": -0.99,
+    "volume": 5396684
+  }
+}
+```
+
+Historical price data is not included in this daily snapshot.

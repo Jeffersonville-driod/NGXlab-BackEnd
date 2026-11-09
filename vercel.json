@@ -13,5 +13,11 @@
       "source": "/:path*",
       "destination": "/frontend/build/web/:path*"
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/market/refresh",
+      "schedule": "0 18 * * *"
+    }
   ]
 }
