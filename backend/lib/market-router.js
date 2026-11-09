@@ -180,6 +180,52 @@ router.get('/stocks', async (req, res) => {
   }
 });
 
+router.get('/stocks/:symbol', async (req, res) => {
+  const symbol = typeof req.params.symbol === 'string'
+    ? req.params.symbol.trim().toUpperCase()
+    : '';
+  if (!/^[A-Z0-9][A-Z0-9.-]{0,19}$/.test(symbol)) {
+    return res.status(400).json({
+      error: {
+        code: 'INVALID_SYMBOL',
+        message: 'A valid stock symbol is required'
+      }
+    });
+  }
+
+  try {
+    const { marketSnapshots } = await getAuthCollections();
+    const snapshot = await marketSnapshots.findOne({ _id: 'latest' });
+    if (!snapshot) {
+      return res.status(503).json({
+        error: {
+          code: 'MARKET_DATA_NOT_READY',
+          message: 'Market data has not been collected yet'
+        }
+      });
+    }
+
+    const stock = snapshot.stocks.find((item) => item.symbol === symbol);
+    if (!stock) {
+      return res.status(404).json({
+        error: {
+          code: 'UNKNOWN_SYMBOL',
+          message: 'The symbol is not in the latest market snapshot'
+        }
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      as_of: snapshot.asOf,
+      trade_date: stock.trade_date || snapshot.tradeDate,
+      stock
+    });
+  } catch (error) {
+    return sendMarketError(res, error, 'stored stock quote');
+  }
+});
+
 router.get('/refresh', async (req, res) => {
   if (!isAuthorizedCronRequest(req)) {
     return res.status(401).json({

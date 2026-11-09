@@ -45,12 +45,19 @@ function roundNaira(value) {
   return Math.round((value + Number.EPSILON) * 100) / 100;
 }
 
-function mapHolding(holding) {
+function mapHolding(holding, marketStocks) {
+  const quote = marketStocks.find((stock) => stock.symbol === holding.symbol);
+  const currentPrice = Number.isFinite(quote?.current_price) && quote.current_price > 0
+    ? quote.current_price
+    : null;
+
   return {
     symbol: holding.symbol,
     name: holding.name,
     quantity: holding.quantity,
-    averagePrice: holding.averagePrice
+    averagePrice: holding.averagePrice,
+    currentPrice,
+    marketValueNgn: currentPrice === null ? null : roundNaira(currentPrice * holding.quantity)
   };
 }
 
@@ -68,13 +75,14 @@ function mapTrade(trade) {
   };
 }
 
-async function getPortfolio(users, portfolios, trades, userId, session) {
+async function getPortfolio(users, portfolios, trades, marketSnapshots, userId, session) {
   const options = session ? { session } : undefined;
   const user = await users.findOne({ _id: userId }, {
     projection: { virtualBalanceNgn: 1 },
     ...options
   });
   const portfolio = await portfolios.findOne({ _id: userId }, options);
+  const marketSnapshot = await marketSnapshots.findOne({ _id: 'latest' }, options);
   const history = await trades.find({ userId }, options)
     .sort({ tradeDate: -1 })
     .limit(tradeHistoryLimit)
@@ -86,7 +94,12 @@ async function getPortfolio(users, portfolios, trades, userId, session) {
 
   return {
     virtualBalanceNgn: user.virtualBalanceNgn ?? 0,
-    holdings: (portfolio?.holdings || []).map(mapHolding),
+    as_of: marketSnapshot?.asOf ?? null,
+    market_trade_date: marketSnapshot?.tradeDate ?? null,
+    holdings: (portfolio?.holdings || []).map((holding) => mapHolding(
+      holding,
+      marketSnapshot?.stocks || []
+    )),
     tradeHistory: history.map(mapTrade)
   };
 }
@@ -94,8 +107,8 @@ async function getPortfolio(users, portfolios, trades, userId, session) {
 router.use(requireSession);
 
 router.get('/', asyncHandler(async (req, res) => {
-  const { users, portfolios, trades } = await getAuthCollections();
-  const portfolio = await getPortfolio(users, portfolios, trades, req.user._id);
+  const { users, portfolios, trades, marketSnapshots } = await getAuthCollections();
+  const portfolio = await getPortfolio(users, portfolios, trades, marketSnapshots, req.user._id);
   return res.status(200).json({ success: true, portfolio });
 }));
 
@@ -215,7 +228,14 @@ router.post('/trades', asyncHandler(async (req, res) => {
       const insertedTrade = await trades.insertOne(tradeResult, { session });
       tradeResult._id = insertedTrade.insertedId;
 
-      updatedPortfolio = await getPortfolio(users, portfolios, trades, req.user._id, session);
+      updatedPortfolio = await getPortfolio(
+        users,
+        portfolios,
+        trades,
+        marketSnapshots,
+        req.user._id,
+        session
+      );
     }, {
       readConcern: { level: 'snapshot' },
       writeConcern: { w: 'majority' },

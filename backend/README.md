@@ -136,6 +136,29 @@ Vercel runs `GET /api/market/refresh` once daily at 18:00 UTC. That protected ro
 
 Returns all stocks from the latest MongoDB snapshot, without making a Kobo request.
 
+### `GET /api/market/stocks/:symbol`
+
+Returns the selected stock's quote and snapshot dates from MongoDB, without making a Kobo request. The symbol is case-insensitive. For example, `GET /api/market/stocks/dangsugar` returns:
+
+```json
+{
+  "success": true,
+  "as_of": "2026-11-06T18:00:00.000Z",
+  "trade_date": "2026-11-06T00:00:00",
+  "stock": {
+    "symbol": "DANGSUGAR",
+    "name": "Dangote Sugar Refinery Plc",
+    "current_price": 65,
+    "change_percent": -0.99,
+    "volume": 5396684,
+    "sector": "Consumer Goods",
+    "trade_date": "2026-11-06T00:00:00"
+  }
+}
+```
+
+An invalid symbol returns `400` (`INVALID_SYMBOL`), and a symbol not found in the latest snapshot returns `404` (`UNKNOWN_SYMBOL`).
+
 ### `GET /api/market/dangsugar`
 
 Returns DANGSUGAR's latest quote from the MongoDB snapshot. It does not call Kobo or consume API quota.
@@ -169,12 +192,16 @@ Returns the signed-in user's virtual cash balance, current holdings, and up to t
   "success": true,
   "portfolio": {
     "virtualBalanceNgn": 999350,
+    "as_of": "2026-11-06T18:00:00.000Z",
+    "market_trade_date": "2026-11-06T00:00:00",
     "holdings": [
       {
         "symbol": "DANGSUGAR",
         "name": "Dangote Sugar Refinery Plc",
         "quantity": 10,
-        "averagePrice": 65
+        "averagePrice": 65,
+        "currentPrice": 65,
+        "marketValueNgn": 650
       }
     ],
     "tradeHistory": [
@@ -195,6 +222,7 @@ Returns the signed-in user's virtual cash balance, current holdings, and up to t
 ```
 
 Holding `averagePrice` is the weighted average purchase price. Each trade's `price` is the stored quote per share and `total` is the rounded-to-kobo execution value. `trade_date` is the execution timestamp; `market_trade_date` identifies the quote's market date.
+The portfolio's `as_of` and `market_trade_date` identify the MongoDB snapshot used to value holdings. Each holding includes its weighted `averagePrice`, latest stored `currentPrice`, and `marketValueNgn`; current price and market value are `null` if that holding has no quote in the latest snapshot.
 
 ### `POST /api/portfolio/trades`
 
@@ -226,12 +254,16 @@ Request:
   },
   "portfolio": {
     "virtualBalanceNgn": 999350,
+    "as_of": "2026-11-06T18:00:00.000Z",
+    "market_trade_date": "2026-11-06T00:00:00",
     "holdings": [
       {
         "symbol": "DANGSUGAR",
         "name": "Dangote Sugar Refinery Plc",
         "quantity": 10,
-        "averagePrice": 65
+        "averagePrice": 65,
+        "currentPrice": 65,
+        "marketValueNgn": 650
       }
     ],
     "tradeHistory": [
