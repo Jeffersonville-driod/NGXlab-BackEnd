@@ -237,7 +237,7 @@ router.get('/refresh', async (req, res) => {
   }
 
   try {
-    const { marketSnapshots } = await getAuthCollections();
+    const { marketSnapshots, marketHistory } = await getAuthCollections();
     const today = new Date().toISOString().slice(0, 10);
     const now = new Date();
     try {
@@ -301,6 +301,12 @@ router.get('/refresh', async (req, res) => {
         .map(mapStock)
     };
 
+    const historyId = `snapshot:${refreshedAt.toISOString()}`;
+    await marketHistory.replaceOne(
+      { _id: historyId },
+      { ...snapshot, _id: historyId },
+      { upsert: true }
+    );
     await marketSnapshots.replaceOne({ _id: 'latest' }, snapshot, { upsert: true });
     return res.status(200).json({
       success: true,

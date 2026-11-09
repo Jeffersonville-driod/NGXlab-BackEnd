@@ -4,7 +4,8 @@
   "description": "Serverless Node.js backend for Flutter Web",
   "main": "api/index.js",
   "scripts": {
-    "start": "node api/index.js"
+    "start": "node api/index.js",
+    "test": "node --test"
   },
   "dependencies": {
     "cors": "^2.8.5",

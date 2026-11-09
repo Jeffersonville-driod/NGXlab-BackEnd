@@ -3,6 +3,12 @@ const { promisify } = require('node:util');
 const express = require('express');
 const { OAuth2Client } = require('google-auth-library');
 const { getAuthCollections } = require('./auth-database');
+const { requireSession } = require('./session-auth');
+const {
+  insertUserWithSimulatedInvestorIds,
+  provisionSimulatedInvestorIds
+} = require('./simulated-investor-ids');
+const { applyTemporaryLoginBalance } = require('./temporary-login-balance');
 
 const router = express.Router();
 const scrypt = promisify(crypto.scrypt);
@@ -221,6 +227,8 @@ async function sendWelcomeEmail(user) {
   const safeName = escapeHtml(user.name || 'there');
   const siteUrl = 'https://www.ngxlab.xyz';
   const safeSiteUrl = escapeHtml(siteUrl);
+  const cscsId = user.simulatedInvestorIds.cscs;
+  const chnId = user.simulatedInvestorIds.chn;
   const response = await fetch(configuration.endpoint, {
     method: 'POST',
     headers: {
@@ -232,7 +240,7 @@ async function sendWelcomeEmail(user) {
       from: configuration.from,
       to: [user.email],
       subject: 'Welcome to NGXLab — learn the why',
-      text: `Hi ${user.name || 'there'},\n\nWelcome to NGXLab — a thoughtful place to learn about investing, explore Nigerian market concepts, and reflect on your choices. Your practice account starts with ₦1,000,000 in virtual funds. This is simulated money and has no cash value.\n\nNo real orders, no pressure, and no promises of returns. Just room to learn at your own pace.\n\nExplore NGXLab: ${siteUrl}\n\nThe NGXLab team`,
+      text: `Hi ${user.name || 'there'},\n\nWelcome to NGXLab — a thoughtful place to learn about investing, explore Nigerian market concepts, and reflect on your choices. Your practice account starts with ₦1,000,000 in virtual funds. This is simulated money and has no cash value.\n\nYour simulated investor identifiers:\nCSCS: ${cscsId}\nCHN: ${chnId}\n\nSimulated — not valid for real trading. These identifiers cannot be used for brokerage, settlement, or securities transfers.\n\nNo real orders, no pressure, and no promises of returns. Just room to learn at your own pace.\n\nExplore NGXLab: ${siteUrl}\n\nThe NGXLab team`,
       html: `<!doctype html>
 <html lang="en">
   <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head>
@@ -249,6 +257,18 @@ async function sendWelcomeEmail(user) {
           <div style="color:#547164;font-size:12px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;">Welcome aboard</div>
           <h1 style="margin:12px 0 16px;color:#123d32;font-size:30px;line-height:1.2;">Hi ${safeName},<br>learn the why.</h1>
           <p style="margin:0;color:#43534c;font-size:16px;line-height:1.7;">Your NGXLab account is ready with ₦1,000,000 in virtual practice funds. This simulated balance has no cash value. Use it to build understanding, explore ideas, and take your time.</p>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:0 36px 28px;">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f5f8f2;border:1px solid #dfe8d8;border-radius:8px;">
+            <tr><td style="padding:18px 20px;">
+              <p style="margin:0 0 12px;color:#123d32;font-size:15px;font-weight:700;">Your simulated investor identifiers</p>
+              <p style="margin:0 0 8px;color:#43534c;font-size:14px;line-height:1.6;"><strong>CSCS:</strong> ${escapeHtml(cscsId)}</p>
+              <p style="margin:0 0 12px;color:#43534c;font-size:14px;line-height:1.6;"><strong>CHN:</strong> ${escapeHtml(chnId)}</p>
+              <p style="margin:0;color:#718078;font-size:12px;line-height:1.6;font-weight:700;">Simulated — not valid for real trading. These identifiers cannot be used for brokerage, settlement, or securities transfers.</p>
+            </td></tr>
+          </table>
         </td>
       </tr>
       <tr>
@@ -370,7 +390,11 @@ function publicUser(user) {
     id: user._id.toString(),
     name: user.name,
     email: user.email,
-    virtualBalanceNgn: user.virtualBalanceNgn ?? 0
+    virtualBalanceNgn: user.virtualBalanceNgn ?? 0,
+    simulatedInvestorIds: {
+      cscs: user.simulatedInvestorIds.cscs,
+      chn: user.simulatedInvestorIds.chn
+    }
   };
 }
 
@@ -427,8 +451,7 @@ async function findOrCreateGoogleUser(profile, users) {
   };
 
   try {
-    const result = await users.insertOne(newUser);
-    newUser._id = result.insertedId;
+    await insertUserWithSimulatedInvestorIds(users, newUser);
     return { user: newUser, created: true };
   } catch (error) {
     if (!isDuplicateKeyError(error)) {
@@ -461,8 +484,7 @@ router.post('/register', requireFrontendOrigin, asyncHandler(async (req, res) =>
   };
 
   try {
-    const result = await users.insertOne(user);
-    user._id = result.insertedId;
+    await insertUserWithSimulatedInvestorIds(users, user);
   } catch (error) {
     if (isDuplicateKeyError(error)) {
       throw new HttpError(409, 'EMAIL_ALREADY_REGISTERED', 'An account with this email already exists');
@@ -473,6 +495,12 @@ router.post('/register', requireFrontendOrigin, asyncHandler(async (req, res) =>
   await createSession(user._id, sessions, res);
   await sendWelcomeEmailSafely(user);
   return res.status(201).json({ user: publicUser(user) });
+}));
+
+router.get('/me', requireSession, asyncHandler(async (req, res) => {
+  const { users } = await getAuthCollections();
+  const user = await provisionSimulatedInvestorIds(users, req.user._id);
+  return res.status(200).json({ user: publicUser(user) });
 }));
 
 router.post('/login', requireFrontendOrigin, asyncHandler(async (req, res) => {
@@ -489,8 +517,10 @@ router.post('/login', requireFrontendOrigin, asyncHandler(async (req, res) => {
     throw new HttpError(401, 'INVALID_CREDENTIALS', 'Email or password is incorrect');
   }
 
+  const fundedUser = await applyTemporaryLoginBalance(users, user);
+  const provisionedUser = await provisionSimulatedInvestorIds(users, fundedUser._id);
   await createSession(user._id, sessions, res);
-  return res.status(200).json({ user: publicUser(user) });
+  return res.status(200).json({ user: publicUser(provisionedUser) });
 }));
 
 router.post('/forgot-password', requireFrontendOrigin, asyncHandler(async (req, res) => {
@@ -584,7 +614,7 @@ router.post('/google', requireFrontendOrigin, asyncHandler(async (req, res) => {
   }
 
   const { users, sessions } = await getAuthCollections();
-  const { user, created } = await findOrCreateGoogleUser({
+  const { user: signedInUser, created } = await findOrCreateGoogleUser({
     subject: payload.sub,
     email: validateEmail(payload.email),
     name: typeof payload.name === 'string' && payload.name.trim()
@@ -592,6 +622,7 @@ router.post('/google', requireFrontendOrigin, asyncHandler(async (req, res) => {
       : payload.email.split('@')[0].slice(0, 100)
   }, users);
 
+  const user = await provisionSimulatedInvestorIds(users, signedInUser._id);
   await createSession(user._id, sessions, res);
   if (created) {
     await sendWelcomeEmailSafely(user);
@@ -600,3 +631,5 @@ router.post('/google', requireFrontendOrigin, asyncHandler(async (req, res) => {
 }));
 
 module.exports = router;
+module.exports.publicUser = publicUser;
+module.exports.sendWelcomeEmail = sendWelcomeEmail;

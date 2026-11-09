@@ -33,13 +33,32 @@ async function getAuthCollections() {
   const passwordResetTokens = database.collection('passwordResetTokens');
   const authRateLimits = database.collection('authRateLimits');
   const marketSnapshots = database.collection('marketSnapshots');
+  const marketHistory = database.collection('marketHistory');
   const portfolios = database.collection('portfolios');
   const trades = database.collection('trades');
+  const contests = database.collection('contests');
+  const contestParticipants = database.collection('contestParticipants');
+  const contestPortfolios = database.collection('contestPortfolios');
+  const contestTrades = database.collection('contestTrades');
 
   if (!indexesPromise) {
     indexesPromise = Promise.all([
       users.createIndex({ email: 1 }, { unique: true }),
       users.createIndex({ googleSub: 1 }, { unique: true, sparse: true }),
+      users.createIndex(
+        { 'simulatedInvestorIds.cscs': 1 },
+        {
+          unique: true,
+          partialFilterExpression: { 'simulatedInvestorIds.cscs': { $type: 'string' } }
+        }
+      ),
+      users.createIndex(
+        { 'simulatedInvestorIds.chn': 1 },
+        {
+          unique: true,
+          partialFilterExpression: { 'simulatedInvestorIds.chn': { $type: 'string' } }
+        }
+      ),
       sessions.createIndex({ tokenHash: 1 }, { unique: true }),
       sessions.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
       passwordResetTokens.createIndex({ tokenHash: 1 }, { unique: true }),
@@ -47,7 +66,12 @@ async function getAuthCollections() {
       passwordResetTokens.createIndex({ userId: 1 }),
       authRateLimits.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
       portfolios.createIndex({ userId: 1 }, { unique: true }),
-      trades.createIndex({ userId: 1, tradeDate: -1 })
+      trades.createIndex({ userId: 1, tradeDate: -1 }),
+      marketHistory.createIndex({ refreshedAt: -1 }),
+      contestParticipants.createIndex({ contestId: 1, userId: 1 }, { unique: true }),
+      contestParticipants.createIndex({ contestId: 1, createdAt: 1 }),
+      contestPortfolios.createIndex({ contestId: 1, userId: 1 }, { unique: true }),
+      contestTrades.createIndex({ contestId: 1, userId: 1, tradeDate: -1 })
     ]).catch((error) => {
       indexesPromise = undefined;
       throw error;
@@ -66,8 +90,13 @@ async function getAuthCollections() {
     passwordResetTokens,
     authRateLimits,
     marketSnapshots,
+    marketHistory,
     portfolios,
     trades,
+    contests,
+    contestParticipants,
+    contestPortfolios,
+    contestTrades,
     client
   };
 }
